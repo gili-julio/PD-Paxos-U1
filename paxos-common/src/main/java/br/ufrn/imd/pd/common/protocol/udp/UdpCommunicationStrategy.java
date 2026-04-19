@@ -10,14 +10,12 @@ public class UdpCommunicationStrategy implements CommunicationStrategy {
 
     @Override
     public CommunicationServer createServer(int port, MessageHandler handler) {
-        // TODO: implementar UdpServer
-        throw new UnsupportedOperationException("UDP server ainda nao implementado");
+        return new UdpServer(port, handler);
     }
 
     @Override
     public CommunicationClient createClient(String host, int port) {
-        // TODO: implementar UdpClient
-        throw new UnsupportedOperationException("UDP client ainda nao implementado");
+        return new UdpClient(host, port);
     }
 
     @Override
