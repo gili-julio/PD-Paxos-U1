@@ -10,14 +10,12 @@ public class TcpCommunicationStrategy implements CommunicationStrategy {
 
     @Override
     public CommunicationServer createServer(int port, MessageHandler handler) {
-        // TODO: implementar TcpServer
-        throw new UnsupportedOperationException("TCP server ainda nao implementado");
+        return new TcpServer(port, handler);
     }
 
     @Override
     public CommunicationClient createClient(String host, int port) {
-        // TODO: implementar TcpClient
-        throw new UnsupportedOperationException("TCP client ainda nao implementado");
+        return new TcpClient(host, port);
     }
 
     @Override
