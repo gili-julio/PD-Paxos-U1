@@ -15,13 +15,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class UdpServer implements CommunicationServer {
 
     private static final Logger logger = LoggerFactory.getLogger(UdpServer.class);
 
     private static final int MAX_PACKET_SIZE = 65507;
-    private static final int THREAD_POOL_SIZE = 16;
+    private static final int SOCKET_BUFFER_SIZE = 4 * 1024 * 1024; // 4MB
 
     private final int port;
     private final MessageHandler handler;
@@ -29,6 +30,7 @@ public class UdpServer implements CommunicationServer {
     private DatagramSocket socket;
     private ExecutorService threadPool;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final AtomicInteger threadCount = new AtomicInteger(0);
 
     public UdpServer(int port, MessageHandler handler) {
         this.port = port;
@@ -38,7 +40,13 @@ public class UdpServer implements CommunicationServer {
     @Override
     public void start() throws IOException {
         socket = new DatagramSocket(port);
-        threadPool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+        socket.setReceiveBufferSize(SOCKET_BUFFER_SIZE);
+        socket.setSendBufferSize(SOCKET_BUFFER_SIZE);
+        threadPool = Executors.newCachedThreadPool(r -> {
+            Thread t = new Thread(r, "udp-worker-" + port + "-" + threadCount.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        });
         running.set(true);
 
         Thread listenerThread = new Thread(this::receiveLoop, "udp-server-" + port);
@@ -68,7 +76,7 @@ public class UdpServer implements CommunicationServer {
     private void processPacket(String raw, InetAddress sender, int senderPort) {
         MessageEnvelope request;
         try {
-            request = HttpLikeCodec.decode(raw);
+            request = UdpJsonCodec.decode(raw);
         } catch (Exception e) {
             logger.error("Erro ao decodificar pacote de {}:{}", sender, senderPort, e);
             return;
@@ -82,7 +90,7 @@ public class UdpServer implements CommunicationServer {
             response = MessageEnvelope.response(500, "{\"error\":\"" + e.getMessage() + "\"}");
         }
 
-        byte[] responseBytes = HttpLikeCodec.encode(response).getBytes(StandardCharsets.UTF_8);
+        byte[] responseBytes = UdpJsonCodec.encode(response).getBytes(StandardCharsets.UTF_8);
 
         synchronized (socket) {
             try {

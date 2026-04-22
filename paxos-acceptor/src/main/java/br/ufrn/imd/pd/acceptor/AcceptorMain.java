@@ -54,6 +54,8 @@ public class AcceptorMain {
         if (config.getGatewayHost() != null) {
             registrarNoGateway(strategy, config, acceptorId);
 
+            CommunicationClient heartbeatClient = strategy.createClient(config.getGatewayHost(), config.getGatewayPort());
+
             ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
                 Thread t = new Thread(r, "acceptor-heartbeat-" + config.getPort());
                 t.setDaemon(true);
@@ -61,17 +63,24 @@ public class AcceptorMain {
             });
 
             scheduler.scheduleAtFixedRate(
-                    () -> enviarHeartbeat(strategy, config),
+                    () -> enviarHeartbeat(heartbeatClient, config),
                     HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS);
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 logger.info("Desligando Acceptor porta {}...", config.getPort());
                 scheduler.shutdown();
+                heartbeatClient.close();
                 server.stop();
             }));
         } else {
             logger.warn("Gateway nao configurado.");
             Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
+        }
+
+        try {
+            Thread.currentThread().join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -108,16 +117,12 @@ public class AcceptorMain {
         logger.error("Nao foi possivel registrar no Gateway apos {} tentativas.", REGISTER_RETRY_ATTEMPTS);
     }
 
-    private static void enviarHeartbeat(CommunicationStrategy strategy, AppConfig config) {
-        JsonObject body = new JsonObject();
-        body.addProperty("serviceName", "acceptor");
-        body.addProperty("port", config.getPort());
-
+    private static void enviarHeartbeat(CommunicationClient client, AppConfig config) {
         try {
-            CommunicationClient client = strategy.createClient(config.getGatewayHost(), config.getGatewayPort());
-            MessageEnvelope response = client.send(MessageEnvelope.request("POST", "/heartbeat", body.toString())).get(3, TimeUnit.SECONDS);
-            client.close();
-
+            MessageEnvelope msg = MessageEnvelope.request("POST", "/heartbeat", null);
+            msg.addHeader("X-Service-Host", "localhost");
+            msg.addHeader("X-Service-Port", String.valueOf(config.getPort()));
+            MessageEnvelope response = client.send(msg).get(8, TimeUnit.SECONDS);
             if (response.getStatusCode() != 200) {
                 logger.warn("Heartbeat nao confirmado (status {})", response.getStatusCode());
             }

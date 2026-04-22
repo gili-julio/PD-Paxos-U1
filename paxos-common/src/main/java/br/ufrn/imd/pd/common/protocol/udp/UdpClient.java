@@ -42,7 +42,7 @@ public class UdpClient implements CommunicationClient {
     }
 
     private MessageEnvelope doSend(MessageEnvelope request) {
-        byte[] requestBytes = HttpLikeCodec.encode(request).getBytes(StandardCharsets.UTF_8);
+        byte[] requestBytes = UdpJsonCodec.encode(request).getBytes(StandardCharsets.UTF_8);
         Exception lastException = null;
 
         for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -57,7 +57,7 @@ public class UdpClient implements CommunicationClient {
                 socket.receive(responsePacket);
 
                 String raw = new String(responsePacket.getData(), 0, responsePacket.getLength(), StandardCharsets.UTF_8);
-                return HttpLikeCodec.decode(raw);
+                return UdpJsonCodec.decode(raw);
 
             } catch (SocketTimeoutException e) {
                 logger.warn("Timeout tentativa {}/{} para {}:{}", attempt, MAX_RETRIES, host, port);

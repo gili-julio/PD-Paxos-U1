@@ -20,19 +20,15 @@ public class PaxosProposerLogic {
 
     private static final Logger logger = LoggerFactory.getLogger(PaxosProposerLogic.class);
 
-    private static final int MAX_PAXOS_RETRIES = 3;
+    private static final int MAX_PAXOS_RETRIES = 10;
     private static final long RETRY_DELAY_MS = 100;
 
-    private final CommunicationStrategy strategy;
-    private final String gatewayHost;
-    private final int gatewayPort;
+    private final CommunicationClient gatewayClient;
     private final ProposalNumberGenerator proposalGenerator;
     private final Gson gson;
 
     public PaxosProposerLogic(CommunicationStrategy strategy, String gatewayHost, int gatewayPort, int proposerPort) {
-        this.strategy = strategy;
-        this.gatewayHost = gatewayHost;
-        this.gatewayPort = gatewayPort;
+        this.gatewayClient = strategy.createClient(gatewayHost, gatewayPort);
         this.proposalGenerator = new ProposalNumberGenerator(proposerPort);
         this.gson = new Gson();
     }
@@ -98,9 +94,7 @@ public class PaxosProposerLogic {
         msg.setBody(gson.toJson(new PaxosPrepareRequest(key, n.getValue())));
 
         try {
-            CommunicationClient client = strategy.createClient(gatewayHost, gatewayPort);
-            MessageEnvelope response = client.send(msg).get(5, TimeUnit.SECONDS);
-            client.close();
+            MessageEnvelope response = gatewayClient.send(msg).get(5, TimeUnit.SECONDS);
 
             if (response.getStatusCode() != 200 || response.getBody() == null) {
                 logger.error("[PAXOS] Gateway respondeu {} ao PREPARE relay", response.getStatusCode());
@@ -155,9 +149,7 @@ public class PaxosProposerLogic {
         msg.setBody(gson.toJson(new PaxosAcceptRequest(key, proposalNumber, value)));
 
         try {
-            CommunicationClient client = strategy.createClient(gatewayHost, gatewayPort);
-            MessageEnvelope response = client.send(msg).get(5, TimeUnit.SECONDS);
-            client.close();
+            MessageEnvelope response = gatewayClient.send(msg).get(5, TimeUnit.SECONDS);
 
             if (response.getStatusCode() != 200 || response.getBody() == null) {
                 logger.error("[PAXOS] Gateway respondeu {} ao ACCEPT relay", response.getStatusCode());

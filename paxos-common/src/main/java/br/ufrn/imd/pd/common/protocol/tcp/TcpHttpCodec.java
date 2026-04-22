@@ -3,6 +3,7 @@ package br.ufrn.imd.pd.common.protocol.tcp;
 import br.ufrn.imd.pd.common.protocol.MessageEnvelope;
 
 import java.io.BufferedReader;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -51,14 +52,25 @@ public class TcpHttpCodec {
         out.flush();
     }
 
-    public static MessageEnvelope read(InputStream in) throws IOException {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
-
+    // Usado pelo servidor (keep-alive): reutiliza o mesmo reader por conexão
+    public static MessageEnvelope read(BufferedReader reader) throws IOException {
         String firstLine = reader.readLine();
-        if (firstLine == null || firstLine.isBlank()) {
+        if (firstLine == null) {
+            throw new EOFException("Conexao encerrada pelo cliente");
+        }
+        if (firstLine.isBlank()) {
             return MessageEnvelope.response(400, "");
         }
+        return parseEnvelope(reader, firstLine);
+    }
 
+    // Mantido para compatibilidade (UdpServer, etc.)
+    public static MessageEnvelope read(InputStream in) throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
+        return read(reader);
+    }
+
+    private static MessageEnvelope parseEnvelope(BufferedReader reader, String firstLine) throws IOException {
         MessageEnvelope envelope = new MessageEnvelope();
 
         if (firstLine.startsWith(HTTP_VERSION)) {
