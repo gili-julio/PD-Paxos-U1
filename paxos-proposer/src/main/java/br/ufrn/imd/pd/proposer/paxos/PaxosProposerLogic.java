@@ -14,14 +14,16 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 public class PaxosProposerLogic {
 
     private static final Logger logger = LoggerFactory.getLogger(PaxosProposerLogic.class);
 
-    private static final int MAX_PAXOS_RETRIES = 10;
-    private static final long RETRY_DELAY_MS = 100;
+    private static final int MAX_PAXOS_RETRIES = 5;
+    private static final long RETRY_MIN_MS = 100;
+    private static final long RETRY_MAX_MS = 1000;
 
     private final CommunicationClient gatewayClient;
     private final ProposalNumberGenerator proposalGenerator;
@@ -178,7 +180,8 @@ public class PaxosProposerLogic {
 
     private void sleepBefore(int attempt) {
         if (attempt < MAX_PAXOS_RETRIES) {
-            try { Thread.sleep(RETRY_DELAY_MS * attempt); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            long delay = ThreadLocalRandom.current().nextLong(RETRY_MIN_MS, RETRY_MAX_MS + 1);
+            try { Thread.sleep(delay); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         }
     }
 }
