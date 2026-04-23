@@ -10,14 +10,12 @@ public class GrpcCommunicationStrategy implements CommunicationStrategy {
 
     @Override
     public CommunicationServer createServer(int port, MessageHandler handler) {
-        // TODO: implementar GrpcServer
-        throw new UnsupportedOperationException("gRPC server ainda nao implementado");
+        return new GrpcServer(port, handler);
     }
 
     @Override
     public CommunicationClient createClient(String host, int port) {
-        // TODO: implementar GrpcClient
-        throw new UnsupportedOperationException("gRPC client ainda nao implementado");
+        return new GrpcClient(host, port);
     }
 
     @Override
